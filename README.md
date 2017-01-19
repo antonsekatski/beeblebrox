@@ -91,3 +91,27 @@ export async function load() {
   this.set('user', response)
 }
 ```
+
+# Accessing state and lazy binding
+
+`connect` function passes a special function `store` to props which does two things:
+- Act as a value getter from the state
+- Subscribe a component to update chain using the key passed to `store` function
+
+For example,
+
+```
+class Sidebar extends Component {
+  render() {
+    const user = this.props.store('user')
+
+    const notifications = this.props.store(`notifications#${user.id}`)
+
+    ...
+  }
+}
+
+export default connect(Sidebar)
+```
+
+`Sidebar` component will rerender if either `user` or `notifications#${user.id}` are changed.
