@@ -115,3 +115,7 @@ export default connect(Sidebar)
 ```
 
 `Sidebar` component will rerender if either `user` or `notifications#${user.id}` are changed.
+
+# Example
+
+[Example project](https://github.com/antonsekatski/chat)
