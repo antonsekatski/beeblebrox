@@ -1,75 +1,95 @@
-import * as React from 'react'
-// import hoistStatics from 'hoist-non-react-statics'
+import * as React from 'react';
 
-import Store from './store'
-
-// export interface Getter {
-//   (key: string, defaultValue?: any): any
-// }
+import Store from './store';
 
 export default function connect(WrappedComponent): any {
-  return class Wrapper extends React.Component<any, any> {
-    lastVersions: Object = {}
-    store: Store
-    storeGetter: (this: Wrapper, key: string, defaultValue?: any) => any
-    shouldUpdate: boolean = false
+  class Wrapper extends React.Component<any, any> {
+    static preload: any;
 
-    propsToStore = {}
+    lastVersions: Object = {};
+    store: Store;
+    storeGetter: (this: Wrapper, key: string, defaultValue?: any) => any;
+    shouldUpdate: boolean = false;
+
+    propsToStore = {};
 
     // DO NOT FORGET THIS OR ELSE BUSTED
     static contextTypes = {
-      store: React.PropTypes.object.isRequired
-    }
+      store: React.PropTypes.object.isRequired,
+    };
 
     constructor(props, context) {
-      super(props, context)
+      super(props, context);
 
-      const self = this;
+      this.store = context.store;
 
-      this.store = context.store
+      this.updateHandler = this.updateHandler.bind(this);
 
-      this.updateHandler = this.updateHandler.bind(this)
+      // if (typeof WrappedComponent.preload === 'function') {
+      //   WrappedComponent.preload = WrappedComponent.preload.bind(this.store.actions);
+      // }
 
-      if (WrappedComponent.mapPropsToStore && typeof WrappedComponent.mapPropsToStore === 'function') {
-        const props = WrappedComponent.mapPropsToStore()
+      // if (WrappedComponent.mapPropsToStore && typeof WrappedComponent.mapPropsToStore === 'function') {
+      //   const props = WrappedComponent.mapPropsToStore();
 
-        for(const prop in props) {
-          Object.defineProperty(this.propsToStore, prop, {
-            enumerable: true,
-            get() {
-              return self.storeGetter(props[prop]);
-            }
-          })
-        }
-      }
+      //   for (const prop in props) {
+      //     if (props.hasOwnProperty(prop)) {
+      //       Object.defineProperty(this.propsToStore, prop, {
+      //         enumerable: true,
+      //         get() {
+      //           return this.storeGetter(props[prop]);
+      //         },
+      //       });
+      //     }
+      //   }
+      // }
 
       this.storeGetter = (key: string, defaultValue?: any) => {
         // Subscribe if we haven't already
         if (!this.lastVersions.hasOwnProperty(key)) {
-          this.store.subscribe(key, this.updateHandler)
+          this.store.subscribe(key, this.updateHandler);
         }
 
         // Save last version
-        this.lastVersions[key] = this.store.versions[key]
+        this.lastVersions[key] = true;
 
-        return this.store.stateContext.get(key, defaultValue)
+        return this.store.actionContext.get(key, defaultValue);
       }
+
+      // WrappedComponent.store = (key: string, defaultValue?: any) => {
+      //   // Subscribe if we haven't already
+      //   if (!this.lastVersions.hasOwnProperty(key)) {
+      //     this.store.subscribe(key, this.updateHandler);
+      //   }
+
+      //   // Save last version
+      //   this.lastVersions[key] = this.store.versions[key];
+
+      //   return this.store.stateContext.get(key, defaultValue);
+      // };
+
+      // WrappedComponent.actions = this.store.actions;
     }
 
     componentDidMount() {
-      this.shouldUpdate = true
+      this.shouldUpdate = true;
     }
 
     componentWillUnmount() {
-      this.shouldUpdate = false
+      this.shouldUpdate = false;
     }
 
     updateHandler() {
-      if (this.shouldUpdate) this.forceUpdate()
+      if (this.shouldUpdate) { this.forceUpdate(); };
     }
 
     render() {
-      return <WrappedComponent {...this.props} {...this.propsToStore} store={this.storeGetter} actions={this.store.actions} />
+      return <WrappedComponent {...this.props} {...this.propsToStore} actions={this.store.actions} store={this.storeGetter} />;
     }
   }
+
+  // Use https://github.com/mridgway/hoist-non-react-statics/blob/master/index.js
+  Wrapper.preload = WrappedComponent.preload;
+
+  return Wrapper;
 }

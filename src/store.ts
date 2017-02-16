@@ -1,171 +1,86 @@
-export interface State {
-  [index: string]: any
-}
-
-export interface Subscriptions {
-  [index: string]: (() => void)[]
-}
-
-export interface TTL {
-  [index: string]: number
-}
-
-export interface Versions {
-  [index: string]: number
-}
-
-export interface Actions {
-  [index: string]: any
-}
-
-export interface ReactProps {
-  store: (key: string, defaultValue?: any) => any
-  // cache: (args: { key: string, block: (value: any) => any }) => any
-  actions: Actions
-}
+import ActionContext from './action_context';
 
 export default class Store {
-  state: State = {}
-  ttl: TTL = {}
-  versions: Versions = {}
-  subscriptions: Subscriptions = {}
-  actions = {}
-  stateContext: StateContext
+  state: { [index: string]: any } = {};
+  ttl: { [index: string]: number } = {};
+  subscriptions: { [index: string]: Array<() => void> } = {};
+  actions = {};
+  actionContext: ActionContext;
+
+  timers: { [index: number]: any } = {};
 
   // Can't add new keys or change type, only existing in the initial state
-  strict: boolean = false
+  // strict: boolean = false;
 
-  debug: boolean = true
+  // debug: boolean = true;
 
   constructor({ state = {}, actions = {} }) {
-    this.state = state
+    this.state = state;
 
-    this.stateContext = new StateContext(this.state, this.ttl, this.notify.bind(this))
+    this.actionContext = new ActionContext(this);
 
-    this.actions = makeActions(this.stateContext, actions)
+    this.actions = makeActions(this.actionContext, actions);
   }
 
   dump() {
     return {
-      state: this.state
-    }
+      ttl: this.ttl,
+      state: this.state,
+    };
   }
 
   subscribe(key: string, handler: () => void): void {
-    if (!this.subscriptions.hasOwnProperty(key)) this.subscriptions[key] = []
-    this.subscriptions[key].push(handler)
+    if (!this.subscriptions.hasOwnProperty(key)) { this.subscriptions[key] = []; }
+    this.subscriptions[key].push(handler);
+  }
+
+  setTimer(key: string, ttl: number): void {
+    this.ttl[key] = ttl;
+    this.timers[key] = setTimeout(() => {
+      clearTimeout(this.timers[key]);
+      delete this.timers[key];
+      delete this.ttl[key];
+      this.actionContext.del(key);
+    }, ttl * 1000); // ttl in seconds
   }
 
   notify(key: string): void {
-    (this.subscriptions[key] || []).forEach(handler => handler())
-    this.versions[key] = (this.versions[key] || 0) + 1
-    if (this.debug) console.log(key, this.state[key])
+    (this.subscriptions[key] || []).forEach((handler) => handler());
   }
 
   preload(renderProps, req): Promise<{}> {
     return Promise.all(
       renderProps.components
-      .filter(component => component && component.preload)
-      .reduce((prev, component) => {
-        prev.push(new Promise(resolve => {
-          component.preload.bind(this.actions)(renderProps.params, req)
-          resolve()
-        }))
-      }, [])
-    )
+      .filter((component) => component && component.preload)
+      .reduce((accum, component) => {
+        const fn = component.preload.bind(this.actions);
+        accum.push(fn({ params: renderProps.params, req }));
+        return accum;
+      }, []),
+    );
   }
 }
 
-export class StateContext {
-  // private store: Store
+function makeActions(actionContext: ActionContext, values): any {
+  const actions = {};
 
-  private state: State
-  private ttl: TTL
-  private notify: (key: string) => void
-
-  list = <{
-    push<T>(key: string, value: T): void
-    exists<T>(key: string, callback: (value: T) => boolean): boolean
-    remove<T>(key: string, callback: (value: T) => boolean): boolean
-  }>{}
-
-  constructor(state: State, ttl: TTL, notify: (key: string) => void) {
-    this.state = state
-    this.notify = notify
-
-    this.list.push = listPush.bind(this)
-    this.list.exists = listExists.bind(this)
-    this.list.remove = listRemove.bind(this)
-  }
-
-  set<T>(key: string, value: T) {
-    this.state[key] = value
-    this.notify(key)
-  }
-
-  setex<T>(key: string, value: T, ttl: number) {
-    this.state[key] = value
-    this.ttl[key] = ttl
-    this.notify(key)
-  }
-
-  get<T>(key: string, defaultValue?: any): T {
-    if (!this.state.hasOwnProperty(key)) {
-      return defaultValue
-    }
-    return this.state[key]
-  }
-
-  del(key: string) {
-    const value = this.state[key]
-    delete this.state[key]
-    this.notify(key)
-    return value
-  }
-}
-
-function makeActions(stateContext: StateContext, values): any {
-  const actions = {}
-
-  Object.keys(values).forEach(key => {
+  Object.keys(values).forEach((key) => {
     if (typeof values[key] === 'object') {
-      actions[key] = makeActions(stateContext, values[key])
+      actions[key] = makeActions(actionContext, values[key]);
     } else if (typeof values[key] === 'function') {
-      actions[key] = (...args) => {
-        return new Promise((resolve) => {
-          const returnedValue = values[key].bind(stateContext)(...args)
-          resolve(returnedValue)
-        })
-      }
+      actions[key] = createAction(values[key].bind(actionContext));
     }
-  })
+  });
 
-  return actions
+  return actions;
 }
 
-function listPush<T>(key: string, value: T) {
-  if (!(this.state[key] instanceof Array)) this.state[key] = []
-
-  this.state[key].push(value)
-  this.notify(key)
-}
-
-function listExists<T>(key: string, callback: (value: T) => boolean): boolean {
-  if (!(this.state[key] instanceof Array)) return false
-
-  return this.state[key].some(value => {
-    if (callback(value)) return true
-  })
-}
-
-function listRemove<T>(key: string, callback: (value: T) => boolean): boolean {
-  if (!(this.state[key] instanceof Array)) return false
-
-  return this.state[key].some((value, index) => {
-    if (callback(value)) {
-      this.state[key].splice(index, 1)
-      this.notify(key)
-      return true
-    }
-  })
+function createAction(fn) {
+  // No need to create a Promise here
+  if (fn.constructor.name === 'AsyncFunction') {
+    return fn;
+  }
+  return (...args) => new Promise((resolve) => {
+    resolve(fn(...args));
+  });
 }
