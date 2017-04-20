@@ -1,4 +1,4 @@
-import { default as Store } from './store';
+import Store from './store';
 
 export default class ActionContext {
   private store: Store;
@@ -29,10 +29,13 @@ export default class ActionContext {
   }
 
   get<T>(key: string, defaultValue?: any): T {
-    if (!this.store.state.hasOwnProperty(key)) {
-      return defaultValue;
+    if (this.store.state.hasOwnProperty(key)) {
+      if (!this.store.state[key]) { return defaultValue; }
+
+      return this.store.state[key];
     }
-    return this.store.state[key];
+
+    return defaultValue;
   }
 
   del(key: string) {

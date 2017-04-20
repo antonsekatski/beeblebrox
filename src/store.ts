@@ -48,13 +48,13 @@ export default class Store {
     (this.subscriptions[key] || []).forEach((handler) => handler());
   }
 
-  preload(renderProps, req): Promise<{}> {
+  preload({ location, renderProps, req }): Promise<{}> {
     return Promise.all(
       renderProps.components
       .filter((component) => component && component.preload)
       .reduce((accum, component) => {
         const fn = component.preload.bind(this.actions);
-        accum.push(fn({ params: renderProps.params, req }));
+        accum.push(fn({ location, params: renderProps.params, req }));
         return accum;
       }, []),
     );
@@ -68,19 +68,19 @@ function makeActions(actionContext: ActionContext, values): any {
     if (typeof values[key] === 'object') {
       actions[key] = makeActions(actionContext, values[key]);
     } else if (typeof values[key] === 'function') {
-      actions[key] = createAction(values[key].bind(actionContext));
+      actions[key] = values[key].bind(actionContext);
     }
   });
 
   return actions;
 }
 
-function createAction(fn) {
-  // No need to create a Promise here
-  if (fn.constructor.name === 'AsyncFunction') {
-    return fn;
-  }
-  return (...args) => new Promise((resolve) => {
-    resolve(fn(...args));
-  });
-}
+// function createAction(fn) {
+//   // No need to create a Promise here
+//   // if (fn.constructor.name === 'AsyncFunction') {
+//   //   return fn;
+//   // }
+//   return (...args) => new Promise((resolve) => {
+//     resolve(fn(...args));
+//   });
+// }

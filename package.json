@@ -1,6 +1,6 @@
 {
   "name": "beeblebrox",
-  "version": "1.0.12",
+  "version": "1.0.18",
   "description": "",
   "main": "lib/index.js",
   "dependencies": {
