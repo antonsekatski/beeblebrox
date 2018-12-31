@@ -11,7 +11,7 @@
     "inlineSources": false,
     "noUnusedLocals": true,
     "noEmitOnError": true,
-    "declaration": true,
+    "declaration": false,
     "jsx": "react",
     "outDir": "./lib"
   },
