@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@types/es6-shim": "^0.31.32",
+    "react-mobx": "^1.0.0",
     "@types/react": "^0.15.0",
     "typescript": "^2.1.4",
     "tslint": "^4.4.2",
